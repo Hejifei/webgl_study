@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="theme-color" content="#000000">
+    <title>canvas</title>
+    <style>
+        canvas {
+            /*width: 512px;*/
+            /*height: 512px;*/
+            border: 1px solid #dedede;
+        }
+
+    </style>
+  </head>
+  <body>
+        <div>
+            <canvas width='512' height='512'></canvas>
+        </div>
+        <script>
+            // 生成多边形顶点坐标数组的函数
+            function createCircleVertex(x, y, r, n) {
+                const sin = Math.sin;
+                const cos = Math.cos;
+                const perAngel = (2 * Math.PI) / n;
+                const positionArray = [];
+                for (let i = 0; i < n; i++) {
+                    const angel = perAngel * i;
+                    const pointX = x + r * cos(angel);
+                    const pointY = y + r * sin(angel);
+                    // const pointX = x + r * sin(angel);
+                    // const pointY = y + r * cos(angel);
+                    positionArray.push(pointX, pointY);
+                }
+
+                return new Float32Array(positionArray);
+            }
+
+            // 生成正多角星顶点的数组函数
+            function create2CircleVertex(x, y, r, R, n) {
+                const sin = Math.sin;
+                const cos = Math.cos;
+                const perAngel = Math.PI / n;
+                const positionArray = [];
+                for (let i = 0; i < 2 * n; i++) {
+                    const angel = i * perAngel;
+                    if (i % 2 !== 0) {
+                        const Rx = x + R * cos(angel);
+                        const Ry = y + R * sin(angel);
+                        positionArray.push(Rx, Ry);
+                    } else {
+                        const rx = x + r * cos(angel);
+                        const ry = y + r * sin(angel);
+                        positionArray.push(rx, ry);
+                    }
+                }
+                return new Float32Array(positionArray);
+            }
+
+            // 1、创建WebGL上下文
+            const canvas = document.querySelector('canvas');
+            const gl = canvas.getContext('webgl');
+            // 2、创建WebGL程序
+            // 编写着色器
+            // 顶点着色器
+            const vertex = `
+                attribute vec2 position;
+                varying vec3 color;
+
+                void main() {
+                    gl_PointSize = 1.0;
+                    color = vec3(0.5 + position, 0.0);
+                    gl_Position = vec4(position, 1.0, 1.0);
+                }
+            `;
+
+
+            const fragment = `
+                precision mediump float;
+                varying vec3 color;
+
+                void main()
+                {
+                    // gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `;
+
+            // 将着色器分别创建成shader对象
+            const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, vertex);
+            gl.compileShader(vertexShader);
+
+            const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, fragment);
+            gl.compileShader(fragmentShader);
+
+            // 创建WebGLProgram对象，并将两个shader关联到这个WebGL程序上。WebGLProgram对象到创建过程主要是添加两个着色器shader对象，然后将WebGLProgram对象连接到WebGL上下文对象上。
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+
+            // 通过useProgram选择启用WebGLProgram对象,GPU就会执行我们设定的两个shader程序
+            gl.useProgram(program);
+
+            // 3、将数据存入缓冲区
+            // 定义三角形的三个顶点
+            // WebGL 使用的数据需要用类型数组定义，默认 Float32Array
+            // const points = new Float32Array([
+            //     -1, -1,
+            //     0, 1,
+            //     1 , -1,
+            // ]) // 三角形
+            const points = createCircleVertex(0, 0, 0.2, 4); // 四边形
+            // const points = createCircleVertex(0, 0, 0.5, 5); // 五边形
+            // const points = create2CircleVertex(0, 0, 0.3, 0.6, 5) // 正六教形
+            // 将定义好的数据写入WebGL缓冲区
+            // 步骤：创建缓存对象，将它绑定为当前操作对象，再把当前的数据写入缓存对象。
+            const bufferId = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
+            gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+
+            // 4、将缓冲区数据读取到GPU
+            const vPosition = gl.getAttribLocation(program, 'position'); // 获取顶点着色器中的pos
+            gl.vertexAttribPointer(vPosition, 2, gl.FLOAT, false, 0, 0); // 给变量设置长度和类型
+            gl.enableVertexAttribArray(vPosition); // 激活变量
+
+            // 5、执行着色器程序完成绘制
+            // 调用绘图指令，执行着色器程序完成绘制
+            // 先调用gl.clear清除画布内容，然后调用gl.drawArrays传入绘制模式。
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            /**
+             * mode: 图元类型
+             * first: 指定矢量点数组中的起始索引
+             * count: 要呈现的索引数
+             * instanceCount: 指定要执行的元素范围的实例数
+             */
+            // gl.drawArraysInstanced(mode, first, count, instanceCount);
+            // gl.drawArrays(mode, first, count)
+            // gl.drawArrays(gl.TRIANGLES, 0, points.length / 2); // 实心三角形
+            gl.drawArrays(gl.TRIANGLE_FAN, 0, points.length / 2); // 实心多边形
+            // gl.drawArrays(gl.LINE_LOOP, 0, points.length / 2); // 空心多边形
+
+
+            const addMoreImg = (points, mode = gl.TRIANGLE_FAN) => {
+                const bufferId = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
+                gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+                const vPosition = gl.getAttribLocation(program, 'position');
+                gl.vertexAttribPointer(vPosition, 2, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(vPosition); // 激活变量
+                gl.drawArrays(mode, 0, points.length / 2); // 实心多边形
+            }
+            addMoreImg(createCircleVertex(0, 0.7, 0.2, 5), gl.LINE_LOOP) // 五边形
+            addMoreImg(createCircleVertex(0.7, 0.7, 0.2, 6)) // 五边形
+            addMoreImg(create2CircleVertex(-0.7, 0.7, 0.1, 0.2, 5)) // 正六教形
+        </script>
+  </body>
+</html>
